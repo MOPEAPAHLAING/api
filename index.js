@@ -48,10 +48,6 @@ app.get("/api/records", function(req, res){
     })
 })
 
-app.get("/test", function(req, res){
-    return res.json(req.query);
-})
-
 app.post("/api/records", [
     body("name").not().isEmpty(),
     body("from").not().isEmpty(),
@@ -62,7 +58,7 @@ app.post("/api/records", [
         return res.status(400).json({ errors: errors.array()});
     }
 
-    db.dishes.insert(req.body, function(err, data) {
+    db.records.insert(req.body, function(err, data) {
         if(err) {
             return res.status(500);
         }
@@ -72,17 +68,15 @@ app.post("/api/records", [
     })
 })
 
-app.put("api/records/:id", [
-    param("id").isMongoId(),
-], function(req, res){
+app.put("api/records/:id", function(req, res){
     const _id = req.params.id;
 
-    const errors = validationResult(req);
-    if(!errors.isEmpty()){
-        return res.status(400).json({ errors: errors.array()});
-    }
+    // const errors = validationResult(req);
+    // if(!errors.isEmpty()){
+    //     return res.status(400).json({ errors: errors.array()});
+    // }
 
-    db.dishes.count({
+    db.records.count({
         _id: mongojs.ObjectID(_id)
     }, function(err, count){
         if(count){
@@ -104,6 +98,51 @@ app.put("api/records/:id", [
                     data
                 })
             })
+        }
+    })
+})
+
+app.patch("/api/records/:id", function(req, res){
+    const _id = req.params.id;
+
+    db.dishes.count({
+        _id: mongojs.ObjectID(_id)
+    }, function(err, count) {
+        if(count){
+            db.records.update(
+                { _id: mongojs.ObjectID(_id) },
+                { $set: req.body },
+                { multi: false },
+                function(err, data){
+                    db.records.find({
+                        _id: mongojs.ObjectID(_id)
+                    }, function(err, data){
+                        return res.status(200).json({
+                            meta: { _id }, data
+                        })
+                    })
+                }
+            )
+        }else {
+            return res.sendStatus(404);
+        }
+    })
+})
+
+app.delete("/api/records/:id", function(req, res){
+    const _id = req.params.id;
+
+    db.records.count({
+        _id: mongojs.ObjectID(_id)
+    }, function(err, count){
+        if(count){
+            db.records.remove({
+                _id: mongojs.ObjectID(_id)
+            }, function(err, data){
+                return res.sendStatus(204);
+            })
+        }else {
+            return res.sendStatus(404);
         }
     })
 })
