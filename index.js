@@ -5,12 +5,60 @@ const {body, param, validationResult} = require("express-validator");
 const mongojs = require("mongojs");
 const db = mongojs("test", ["dishes"]);
 
+const jwt = require("jsonwebtoken");
+const secret = "horse battery staple";
+
+const users = [
+    {username: "Alice", password: "password", role: "admin"},
+    {username: "Bob", password: "password", role: "user"}
+]
+
+function auth(req, res, next){
+    const authHeader = req.headers["authorization"];
+    if(!authHeader){
+        return res.sendStatus(401)
+    }
+
+    const [type, token] = authHeader.split(" ");
+    if(type != "Bearer") return res.sendStatus(401);
+
+    jwt.verify(token, secret, function(err, data){
+        if(err) return res.sendStatus(401);
+        else next();
+    })
+}
+
+function onlyAdmin(req, res, next){
+    const [ type, token ] = req.headers["authorization"].split(" ");
+
+    jwt.verify(token, secret, function(err, user){
+        if(user.role === "admin") next();
+        else return res.sendStatus(403);
+    })
+}
+
 const bodyParser = require("body-parser");
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-app.get("/api/records", function(req, res){
+app.post("/api/login", function(req, res){
+    const {username, password} = req.body;
+
+    const user = users.find(function(u){
+        return u.username === username && u.password === password;
+    })
+
+    if(auth){
+        jwt.sign(user, secret, {expiresIn: "1h"}, function(err, token){
+            return res.status(200).json({ token });
+        })
+    }else{
+        return res.sendStatus(401)
+    }
+})
+
+app.get("/api/records", auth, function(req, res){
     const options = req.query;
 
     const sort = options.sort || {};
@@ -129,7 +177,7 @@ app.patch("/api/records/:id", function(req, res){
     })
 })
 
-app.delete("/api/records/:id", function(req, res){
+app.delete("/api/records/:id", auth, onlyAdmin, function(req, res){
     const _id = req.params.id;
 
     db.records.count({
